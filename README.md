@@ -36,7 +36,26 @@ Important notes:
 - Use this slider to move horizontally when opening an image:
   ![slider](https://i.imgur.com/V9JhjjV.jpeg)
 
-## How do I use it?
+### On the command line
+You need to download cli.py from this repo. Then write on your command line of preference:
+   ```
+   python3 cli.py [-flags]
+   ```
+These are the flags:
+-h, --help: Shows the help message and how to use it
+-f, --file: Specify input image.
+-o, --out OUT    Specify out path.
+-a, --alt        Alternative Milk effect (the effect from the second game).
+-p, --pointism   Pointillism effect.
+-c, --comp COMP  Compression. from 0 to 100. Defaults to 0.
+
+So, imagine you want to apply the effect from the second game to image.png, give it the pointillism effect, compress it and save it as saved.png. You would write:
+
+   ```
+   python3 cli.py -f image.png -a -p -c 30 -o saved.png
+   ```
+
+## How do I use the GUI version?
 
 1. Click on "Open a File"
 2. Choose the image you want to convert. It supports png, jpg and jpeg files.
@@ -58,6 +77,7 @@ Important notes:
 
 ## Extra note
 Big thanks to [@R00tKited](https://github.com/R00tKited) for the improvements and refactoring to the code!
+Also to [@Krak9n](https://github.com/Krak9n) for the X11 fix, and to [@horoni](https://github.com/horoni) for the cli version of the script.
 
 ## Final comments
 
