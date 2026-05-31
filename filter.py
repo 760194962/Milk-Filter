@@ -7,6 +7,7 @@ from PIL import Image, ImageTk
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog as fd
+from tkinter import colorchooser
 
 
 
@@ -54,6 +55,9 @@ my_canvas.configure(yscrollcommand=my_scrollbar.set)
 my_canvas.bind('<Configure>',lambda e:my_canvas.configure(scrollregion=my_canvas.bbox("all")))
 
 second_frame = tk.Frame(my_canvas)
+# Update the scroll region whenever the inner content changes size (e.g. the
+# custom controls expand). Binding the canvas alone misses inner-content growth.
+second_frame.bind('<Configure>', lambda e: my_canvas.configure(scrollregion=my_canvas.bbox("all")))
 
 
 # Configure grid in `second_frame` for vertical centering
@@ -78,10 +82,21 @@ def is_scroll_active():
 
 # Function to handle mouse wheel scrolling
 def _on_mouse_wheel(event):
-    if is_scroll_active():  # Only scroll if the scrollbar is active
-        my_canvas.yview_scroll(-1 * int((event.delta / 120)), "units")
+    if not is_scroll_active():  # Only scroll if the scrollbar is active
+        return
+    if event.num == 4:                  # Linux/X11 scroll up
+        delta = 1
+    elif event.num == 5:                # Linux/X11 scroll down
+        delta = -1
+    elif abs(event.delta) >= 120:       # Windows: delta is a multiple of 120
+        delta = int(event.delta / 120)
+    else:                               # macOS: delta is a small step (e.g. +/-1)
+        delta = event.delta
+    my_canvas.yview_scroll(-1 * delta, "units")
 
-my_canvas.bind_all("<MouseWheel>", _on_mouse_wheel)
+my_canvas.bind_all("<MouseWheel>", _on_mouse_wheel)      # Windows / macOS
+my_canvas.bind_all("<Button-4>", _on_mouse_wheel)        # Linux/X11
+my_canvas.bind_all("<Button-5>", _on_mouse_wheel)        # Linux/X11
 
 frame_1 = ttk.Frame(second_frame)
 frame_2 = ttk.Frame(second_frame)
@@ -170,11 +185,17 @@ def apply_filter(filename):
             1: [(0, 0, 0), (102, 0, 31), (137, 0, 146)],
             2: [(0, 0, 0), (92, 36, 60), (203, 43, 43)]
         }
-        colors = color_map[milk_type]
-        pixels = imag.load()
 
-        thresh_mid1 = 120 if milk_type == 1 else 90
-        thresh_mid2 = 200 if milk_type == 1 else 150
+        if milk_type == 3:
+            colors = custom_colors
+            # Keep the two thresholds ordered so the brightness bands stay valid
+            thresh_mid1, thresh_mid2 = sorted((thresh1_int.get(), thresh2_int.get()))
+        else:
+            colors = color_map[milk_type]
+            thresh_mid1 = 120 if milk_type == 1 else 90
+            thresh_mid2 = 200 if milk_type == 1 else 150
+
+        pixels = imag.load()
 
         for y in range(height):
             for x in range(width):
@@ -278,11 +299,13 @@ def select_file():
             compression.pack()
             effect = tk.Checkbutton(frame_3, text='Check this box if you want the pointillism effect on the image or not.', variable = eff,onvalue=1,offvalue=0)
             effect.pack()
-            R1 = tk.Radiobutton(frame_3, text="Milk1 effect", variable=milk, value=1)
+            R1 = tk.Radiobutton(frame_3, text="Milk1 effect", variable=milk, value=1, command=custom_display)
             R1.pack()
             R1.select()
-            R2 = tk.Radiobutton(frame_3, text="Milk2 effect", variable=milk, value=2)
+            R2 = tk.Radiobutton(frame_3, text="Milk2 effect", variable=milk, value=2, command=custom_display)
             R2.pack()
+            R3 = tk.Radiobutton(frame_3, text="Custom effect", variable=milk, value=3, command=custom_display)
+            R3.pack()
 
             apply_button = ttk.Button(frame_3,text='Apply filter',command=lambda: apply_filter(filename))
             apply_button.pack(expand=True)
@@ -320,6 +343,44 @@ comp = tk.IntVar()
 eff = tk.IntVar()
 
 milk = tk.IntVar()
+
+# --- Custom color scheme controls (shown only when "Custom effect" is selected) ---
+# colors[0]=shadows, colors[1]=mid tones, colors[2]=highlights. Defaults match Milk1.
+custom_colors = [(0, 0, 0), (102, 0, 31), (137, 0, 146)]
+
+custom_frame = tk.Frame(frame_3)
+
+def pick_color(index, swatch):
+    initial = '#%02x%02x%02x' % custom_colors[index]
+    rgb, hex_value = colorchooser.askcolor(color=initial, title="Pick a color")
+    if rgb:
+        custom_colors[index] = tuple(int(round(c)) for c in rgb)
+        swatch.config(bg=hex_value)
+
+# Swatches use tk.Label (not tk.Button) because macOS native buttons ignore `bg`.
+for _i, _label in enumerate(("Shadows (dark)", "Mid tones", "Highlights (bright)")):
+    _row = tk.Frame(custom_frame)
+    _row.pack(fill="x", pady=2)
+    tk.Label(_row, text=_label, width=20, anchor="w").pack(side=tk.LEFT)
+    _swatch = tk.Label(_row, width=8, relief="raised", borderwidth=2, cursor="hand2",
+                       bg='#%02x%02x%02x' % custom_colors[_i])
+    _swatch.bind("<Button-1>", lambda e, i=_i, s=_swatch: pick_color(i, s))
+    _swatch.pack(side=tk.LEFT)
+
+thresh1_int = tk.IntVar(value=120)
+thresh2_int = tk.IntVar(value=200)
+tk.Label(custom_frame, text="Shadow / mid threshold (brightness 1-254)").pack()
+ttk.Scale(custom_frame, variable=thresh1_int, from_=1, to=254).pack()
+tk.Label(custom_frame, text="Mid / highlight threshold (brightness 1-254)").pack()
+ttk.Scale(custom_frame, variable=thresh2_int, from_=1, to=254).pack()
+
+def custom_display():
+    if milk.get() == 3:
+        custom_frame.pack(before=apply_button)
+    else:
+        custom_frame.pack_forget()
+    window.update_idletasks()
+    my_canvas.configure(scrollregion=my_canvas.bbox("all"))
 
 rect = Image.new(mode='RGB', size=(int(widthWindow/2.2), int(heightWindow/2.2)),color=(203, 203, 203))
 rectTk = ImageTk.PhotoImage(rect)
