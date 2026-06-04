@@ -1,6 +1,8 @@
 # Milk-Filter
 Choose any image you like and convert it to something you would find in the series Milk inside/outside a bag of milk! There is also another effect which you can try for different results.
 
+> **This fork adds:** a **Custom** effect (pick your own colours + thresholds with a colour picker) and a **Higurashi** effect (turns a real photo into a watercolour-style visual-novel background). Also includes macOS scrolling/colour fixes.
+
 ![Milk Filter Logo.](https://github.com/LucaSinUnaS/Milk-Filter/blob/main/icon.ico)
 
 ## Showcase
@@ -11,10 +13,12 @@ Choose any image you like and convert it to something you would find in the seri
 ### On PC
 There is an EXE file attached which should work perfectly fine on Windows. To download it, head to the releases section of this GitHub page (should be to the right of the website on PC).
 
-If you are on an OS that doesn't support EXE files, you can download the source code (the file called filter.py), then install Python if you haven't already, and finally on the command line, insert:
+If you are on an OS that doesn't support EXE files, you can download the source code (the file called filter.py), then install Python if you haven't already, install the dependencies, and finally on the command line, insert:
 ```
+pip install pillow numpy opencv-python-headless
 python filter.py
 ```
+> `numpy` and `opencv` are only needed for the **Higurashi effect**. The Milk and Custom effects work with just `pillow`.
 ### On Android
 Keep in mind this program was not made for Android, and these steps are just to be baaaarely usable in it, and should be used this way only if you have no other choice. Expect it to be messy and overall bad. Nonetheless, it should still get the job done, I got it to work at least. So here are the steps:
 
@@ -61,7 +65,10 @@ So, imagine you want to apply the effect from the second game to image.png, give
 2. Choose the image you want to convert. It supports png, jpg and jpeg files.
 3. Choose if you want to compress the image or not. Compression gives a more pixelated look that can sometimes imitate the look of the games. Nonetheless, I recommend against using it in most cases.
 4. Choose if you want to give the "pointillism" effect. Don't know how will it look? Give it a try!
-5. Choose between applying the effect from the first or the second game.
+5. Choose an effect:
+   - **Milk1 / Milk2**: the original red 3-colour effects from the first and second games.
+   - **Custom**: pick your own three colours (shadows / mid tones / highlights) with the colour picker and adjust the two brightness thresholds with the sliders.
+   - **Higurashi**: turns a real photo into a watercolour / cartoon-style background (needs numpy + opencv).
 7. Click on "Apply filter". Don't worry if the program freezes for a moment, it's normal since it is converting the image, just wait a few seconds.
 8. A new window will open showcasing the new image, and a button that will open the new image in your default image viewer.
 9. In the main window, you can choose to save the image by clicking on the "Save image" button.

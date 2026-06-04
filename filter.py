@@ -3,11 +3,48 @@ import os
 import io
 import sys
 import random
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageEnhance
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog as fd
 from tkinter import colorchooser
+from tkinter import messagebox
+
+
+# --- Photo-style background filter (Higurashi look) ---
+def higurashi_filter(img):
+    """Real photo -> heavy watercolor / cartoon look. Edge-preserving smoothing
+    on a downscaled copy merges detail into painterly blobs, then strong colour
+    quantisation gives the banded "painted" feel. Uses OpenCV (lazy import)."""
+    import numpy as np
+    import cv2
+
+    src = img.convert('RGB')
+    bgr = cv2.cvtColor(np.array(src), cv2.COLOR_RGB2BGR)
+    h, w = bgr.shape[:2]
+
+    # 1. Smooth on a half-size copy so fine detail dissolves into flat regions,
+    #    repeated passes for a stronger painterly merge.
+    small = cv2.resize(bgr, (max(1, w // 2), max(1, h // 2)), interpolation=cv2.INTER_LINEAR)
+    for _ in range(4):
+        small = cv2.bilateralFilter(small, d=9, sigmaColor=110, sigmaSpace=110)
+    bgr = cv2.resize(small, (w, h), interpolation=cv2.INTER_LINEAR)
+
+    # 2. Aggressive colour quantisation -> bold banding.
+    levels = 4
+    step = 256 // levels
+    bgr = (bgr // step) * step + step // 2
+    bgr = np.clip(bgr, 0, 255).astype(np.uint8)
+
+    # 3. Push saturation hard (the vivid Higurashi palette).
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV).astype(np.float32)
+    hsv[..., 1] *= 1.9
+    hsv = np.clip(hsv, 0, 255).astype(np.uint8)
+    bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+
+    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    out = Image.fromarray(rgb)
+    return ImageEnhance.Contrast(out).enhance(1.15)
 
 
 
@@ -23,7 +60,7 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 window = tk.Tk()
-window.title("Milk filter!")
+window.title("Visual Novel Background Filter")
 widthWindow= window.winfo_screenwidth()               
 heightWindow= window.winfo_screenheight()               
 window.geometry("%dx%d" % (widthWindow, heightWindow))
@@ -179,6 +216,14 @@ def apply_filter(filename):
             buffer.seek(0)
             imag = Image.open(buffer).convert('RGB')
 
+        # Photo-style filters are whole-image transforms; they skip the
+        # per-pixel 3-colour posterisation used by the Milk effects.
+        if milk_type == 4:
+            update_progress(20)
+            result = higurashi_filter(imag)
+            update_progress(100)
+            return result
+
         width, height = imag.size
 
         color_map = {
@@ -246,11 +291,26 @@ def apply_filter(filename):
         show_image(imag)
         apply_button.config(state="normal")
 
+    def on_error(err):
+        progress_bar.pack_forget()
+        applied.config(text="", image=rectTk, compound=None)
+        applied.image = rectTk
+        apply_button.config(state="normal")
+        messagebox.showerror(
+            "Filter failed",
+            f"{err}\n\nThe Higurashi effect needs numpy + opencv:\n"
+            "pip3 install numpy opencv-python-headless"
+        )
+
     def worker():
         def update_progress(val):
             window.after(0, lambda: progress_bar.config(value=val))
 
-        imag = process_image(update_progress)
+        try:
+            imag = process_image(update_progress)
+        except Exception as err:
+            window.after(0, lambda e=err: on_error(e))
+            return
         window.after(0, lambda: on_done(imag))
 
     threading.Thread(target=worker, daemon=True).start()
@@ -306,6 +366,8 @@ def select_file():
             R2.pack()
             R3 = tk.Radiobutton(frame_3, text="Custom effect", variable=milk, value=3, command=custom_display)
             R3.pack()
+            R4 = tk.Radiobutton(frame_3, text="Higurashi effect (watercolor photo)", variable=milk, value=4, command=custom_display)
+            R4.pack()
 
             apply_button = ttk.Button(frame_3,text='Apply filter',command=lambda: apply_filter(filename))
             apply_button.pack(expand=True)
